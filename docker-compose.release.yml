@@ -1,0 +1,150 @@
+# Archie VPN stack — RELEASE compose (Option B: pre-built images).
+#
+# This is the compose an install runs when using pre-built images. It is separate
+# from docker-compose.vpn.yml (which builds from source). Differences:
+#   • vpn-api-v3 / vpn-dashboard-v3 use pre-built IMAGES (ghcr.io/...), not source.
+#   • No source bind-mounts. Runtime STATE lives in ./state (shared by both
+#     services, and by the host traffic poller) via STATE_DIR=/data.
+#   • The dashboard receives per-install NEXT_PUBLIC_* at runtime; its entrypoint
+#     swaps the baked __ARCHIE_*__ sentinels for these on start.
+#   • Legacy v1/v2 services are dropped — a customer never runs them.
+#
+# Systemd services (xray, hysteria-server, wg-quick@wg0) are unaffected, as in prod.
+
+name: vpn
+
+networks:
+  ailab:
+    name: ailab
+    external: true
+
+services:
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8443:8443"
+      - "2053:2053"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/certbot/conf:/etc/letsencrypt:ro
+      - ./data/certbot/www:/var/www/certbot:ro
+      - /etc/ssl/cloudflare-origin.pem:/etc/ssl/cloudflare-origin.pem:ro
+      - /etc/ssl/cloudflare-origin.key:/etc/ssl/cloudflare-origin.key:ro
+      - ./nginx/html:/usr/share/nginx/html:ro
+      - ./nginx/cloudflare-ips.conf:/etc/nginx/cloudflare-ips.conf:ro
+      - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
+    networks:
+      ailab:
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h & wait $${!};
+      done"
+    networks:
+      - ailab
+
+  vpn-api-v3:
+    image: ${ARCHIE_IMAGE_PREFIX:-ghcr.io/ldcobs}/archie-api:${ARCHIE_VERSION:-0.1.5}
+    container_name: vpn-api-v3
+    restart: unless-stopped
+    pid: "host"
+    environment:
+      - SERVER_IP=${SERVER_IP:-}
+      - SERVER_DOMAIN=${SERVER_DOMAIN:-}
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - API_AUTH_TOKEN=${VPN_API_V3_TOKEN:-}
+      - ALLOWED_ORIGINS=${VPN_API_V3_ORIGINS:-}
+      - XRAY_BIN=/usr/local/bin/xray
+      - VLESS_PBK=${VLESS_PBK:-}
+      - VLESS_SID=${VLESS_SID:-}
+      - VLESS_SNI=${VLESS_SNI:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL:-}
+      # Option B: runtime state lives in the shared ./state volume, not beside code.
+      - STATE_DIR=/data
+      - XRAY_AUDIT=/data/pending_config_audit.log
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      # Shared runtime state (persists across restarts; read by the dashboard and
+      # written by the host traffic poller). Replaces the old ./vpn-api-v3 source mount.
+      - ./state:/data
+      - /usr/local/bin/xray:/usr/local/bin/xray:ro
+      - /usr/local/share/xray:/usr/local/share/xray:ro
+      - /var/log/xray:/var/log/xray:rw
+      - /var/log/auth.log:/var/log/auth.log:ro
+      - /usr/local/etc/xray:/etc/xray:rw
+      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+      - /usr/bin/wg:/usr/bin/wg:ro
+      - /usr/bin/nsenter:/usr/bin/nsenter:ro
+      - /etc/wireguard:/etc/wireguard:rw
+    networks:
+      ailab:
+    ports:
+      - "127.0.0.1:5901:5900"
+
+  vpn-dashboard-v3:
+    image: ${ARCHIE_IMAGE_PREFIX:-ghcr.io/ldcobs}/archie-dashboard:${ARCHIE_VERSION:-0.1.5}
+    container_name: vpn-dashboard-v3
+    restart: unless-stopped
+    pid: "host"
+    environment:
+      - AUTH_SECRET=${AUTH_SECRET:-}
+      - AUTH_COOKIE_SECURE=${AUTH_COOKIE_SECURE:-}
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - VPN_API_V3_TOKEN=${VPN_API_V3_TOKEN:-}
+      - WG_SERVER_PUB=${WG_SERVER_PUB:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_SECURE=${SMTP_SECURE:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      # Option B: per-install values injected at runtime (entrypoint swaps the
+      # baked __ARCHIE_*__ sentinels for these before the server starts).
+      - NEXT_PUBLIC_SERVER_IP=${SERVER_IP:-}
+      - NEXT_PUBLIC_SERVER_DOMAIN=${SERVER_DOMAIN:-}
+      - NEXT_PUBLIC_SERVER_PORT=${SERVER_PORT:-443}
+      - NEXT_PUBLIC_PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - NEXT_PUBLIC_BRAND_NAME=${BRAND_NAME:-}
+      - NEXT_PUBLIC_VLESS_PBK=${VLESS_PBK:-}
+      - NEXT_PUBLIC_VLESS_SID=${VLESS_SID:-}
+      - NEXT_PUBLIC_VLESS_SNI=${VLESS_SNI:-}
+      - NEXT_PUBLIC_BASE_PATH=/v3
+      - NEXT_PUBLIC_SECURITY_PAGE_PATH=/security-review
+      - XRAY_CFG=/etc/xray/config.json
+      # State shared with the API (same ./state volume, mounted at /data).
+      - STATE_DIR=/data
+      - PENDING_CFG=/data/pending_config.json
+      - PENDING_AUDIT=/data/pending_config_audit.log
+      - DATA_DIR=/app/data
+      - LOG_ACCESS=/var/log/xray/access.log
+      - LOG_AUTH=/var/log/host/auth.log
+      - LOG_F2B=/var/log/host/fail2ban.log
+    volumes:
+      - ./state:/data
+      - ./dashboard-data:/app/data
+      - /var/log/xray:/var/log/xray:ro
+      - /var/log:/var/log/host:ro
+      - /usr/local/etc/xray/config.json:/etc/xray/config.json:rw
+      - /etc/letsencrypt:/host_certs:ro
+    networks:
+      ailab:

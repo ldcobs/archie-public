@@ -1,0 +1,14 @@
+{
+  "name": "archie-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright acceptance tests for the Archie dashboard. Isolated — does not touch the dashboard source.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0"
+  }
+}

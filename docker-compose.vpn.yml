@@ -1,0 +1,209 @@
+# Archie VPN stack
+name: vpn
+# Manages: nginx (VPN + proxy), certbot, vpn-api-v3, vpn-dashboard-v3
+# uptime-kuma: managed separately via uptime-kuma/docker-compose.yml
+# Systemd services outside this file: xray, hysteria-server, wg-quick@wg0
+# NOTE: Xray, Hysteria2, WireGuard are systemd — unaffected by compose restarts
+#
+# Network: uses an external Docker network ('ailab') so services can reach the
+# VPN APIs by container name without exposing extra ports.
+#
+# To manage this stack independently:
+#   docker compose -f docker-compose.vpn.yml up -d
+#   docker compose -f docker-compose.vpn.yml build vpn-dashboard-v3
+#   docker compose -f docker-compose.vpn.yml logs -f vpn-dashboard-v3
+
+networks:
+  ailab:
+    name: ailab          # external network — do not recreate
+    external: true
+
+services:
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8443:8443"
+      - "2053:2053"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/certbot/conf:/etc/letsencrypt:ro
+      - ./data/certbot/www:/var/www/certbot:ro
+      - /etc/ssl/cloudflare-origin.pem:/etc/ssl/cloudflare-origin.pem:ro
+      - /etc/ssl/cloudflare-origin.key:/etc/ssl/cloudflare-origin.key:ro
+      - ./nginx/html:/usr/share/nginx/html:ro
+      - ./nginx/cloudflare-ips.conf:/etc/nginx/cloudflare-ips.conf:ro
+      - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
+    networks:
+      ailab:
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h & wait $${!};
+      done"
+    networks:
+      - ailab
+
+  vpn-api-v3:
+    image: python:3.12-slim
+    container_name: vpn-api-v3
+    restart: unless-stopped
+    pid: "host"
+    command: python3 /app/vpn-api.py
+    environment:
+      # Client configs (VLESS/Reality URIs) embed these. They MUST come from the
+      # install's .env so generated keys point at THIS host. No default — fail
+      # closed rather than bake any one deployment's host into the source.
+      - SERVER_IP=${SERVER_IP:-}
+      - SERVER_DOMAIN=${SERVER_DOMAIN:-}
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - API_AUTH_TOKEN=${VPN_API_V3_TOKEN:-}
+      - ALLOWED_ORIGINS=${VPN_API_V3_ORIGINS:-}
+      - XRAY_BIN=/usr/local/bin/xray
+      - VLESS_PBK=${VLESS_PBK:-}
+      - VLESS_SID=${VLESS_SID:-}
+      - VLESS_SNI=${VLESS_SNI:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL:-}
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ./vpn-api-v3:/app
+      - /usr/local/bin/xray:/usr/local/bin/xray:ro
+      - /usr/local/share/xray:/usr/local/share/xray:ro
+      - /var/log/xray:/var/log/xray:rw
+      - /var/log/auth.log:/var/log/auth.log:ro
+      # Mount the xray config DIRECTORY (not the single file) so the API's atomic
+      # write (tmp file + rename) happens inside one mount — a single-file bind
+      # mount makes `rename` fail with EBUSY on modern Docker. Backups written
+      # here are *.bak/*.tmp, never *.json, so `xray -confdir` stays clean.
+      - /usr/local/etc/xray:/etc/xray:rw
+      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+      - /usr/bin/wg:/usr/bin/wg:ro
+      - /usr/bin/nsenter:/usr/bin/nsenter:ro
+      - /etc/wireguard:/etc/wireguard:rw
+    networks:
+      ailab:
+    ports:
+      - "127.0.0.1:5901:5900"
+
+  vpn-dashboard-v3:
+    build:
+      context: ./vpn-dashboard-v3
+      dockerfile: Dockerfile
+    container_name: vpn-dashboard-v3
+    restart: unless-stopped
+    # Shares the host PID namespace so /proc/1/net/* (health.ts,
+    # live-connections.ts) reflects the host's network state directly — see
+    # vpn-api-v3 above for why these are read this way instead of bind-mounted.
+    pid: "host"
+    environment:
+      # Server-side auth: the secret signs sessions (must be the install's, not a
+      # dev default), and AUTH_COOKIE_SECURE=false lets the session cookie work
+      # over plain HTTP for IP-only installs (set true behind HTTPS).
+      - AUTH_SECRET=${AUTH_SECRET:-}
+      - AUTH_COOKIE_SECURE=${AUTH_COOKIE_SECURE:-}
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - VPN_API_V3_TOKEN=${VPN_API_V3_TOKEN:-}
+      # Server-side routes generate subscription links, QR payloads, and client
+      # configs at runtime, so the dashboard container needs the same install
+      # identity values that were baked into the browser bundle at build time.
+      - NEXT_PUBLIC_SERVER_IP=${SERVER_IP:-}
+      - NEXT_PUBLIC_SERVER_DOMAIN=${SERVER_DOMAIN:-}
+      - NEXT_PUBLIC_SERVER_PORT=${SERVER_PORT:-443}
+      - NEXT_PUBLIC_PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - NEXT_PUBLIC_BRAND_NAME=${BRAND_NAME:-}
+      - NEXT_PUBLIC_VLESS_PBK=${VLESS_PBK:-}
+      - NEXT_PUBLIC_VLESS_SID=${VLESS_SID:-}
+      - NEXT_PUBLIC_VLESS_SNI=${VLESS_SNI:-}
+      # WireGuard server public key (clients need it in their [Peer]).
+      - WG_SERVER_PUB=${WG_SERVER_PUB:-}
+      # Invite email (optional). Empty by default; a stored override set in
+      # Settings → Email delivery wins per-field over these env values.
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_SECURE=${SMTP_SECURE:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - NEXT_PUBLIC_BASE_PATH=/v3
+      - NEXT_PUBLIC_SECURITY_PAGE_PATH=/security-review
+      - XRAY_CFG=/etc/xray/config.json
+      - PENDING_CFG=/app/vpn-api/pending_config.json
+      - STATE_DIR=/app/vpn-api
+      - DATA_DIR=/app/data
+      - LOG_ACCESS=/var/log/xray/access.log
+      - LOG_AUTH=/var/log/host/auth.log
+      - LOG_F2B=/var/log/host/fail2ban.log
+    volumes:
+      - ./vpn-api-v3:/app/vpn-api
+      - ./vpn-dashboard-v3/data:/app/data
+      - /var/log/xray:/var/log/xray:ro
+      - /var/log:/var/log/host:ro
+      - /usr/local/etc/xray/config.json:/etc/xray/config.json:rw
+      - /etc/letsencrypt:/host_certs:ro
+    networks:
+      ailab:
+
+  # ── Legacy (v1/v2) — kept for continuity, deprecate when v3 is stable ────────
+
+  vpn-api:
+    image: python:3.12-slim
+    container_name: vpn-api
+    restart: unless-stopped
+    command: python3 /app/vpn-api.py
+    environment:
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+    volumes:
+      - ./vpn-api:/app
+      - /var/log/xray:/var/log/xray:ro
+      - /var/log/auth.log:/var/log/auth.log:ro
+      - /usr/local/etc/xray/config.json:/etc/xray/config.json
+      - /etc/wireguard/clients.json:/etc/wireguard/clients.json:ro
+      - /proc/1/net/tcp6:/host_net/tcp6:ro
+      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+    networks:
+      ailab:
+
+  vpn-dashboard:
+    build: ./vpn-dashboard
+    container_name: vpn-dashboard
+    restart: unless-stopped
+    environment:
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - NEXT_PUBLIC_BASE_PATH=/v2
+      - XRAY_CFG=/etc/xray/config.json
+      - PENDING_CFG=/app/vpn-api/pending_config.json
+      - STATE_DIR=/app/vpn-api
+      - DATA_DIR=/app/data
+      - LOG_ACCESS=/var/log/xray/access.log
+      - LOG_AUTH=/var/log/auth.log
+      - LOG_F2B=/var/log/fail2ban.log
+      - HOST_TCP6=/host_net/tcp6
+    volumes:
+      - ./vpn-api:/app/vpn-api
+      - ./vpn-dashboard/data:/app/data
+      - /var/log/xray:/var/log/xray:ro
+      - /var/log/auth.log:/var/log/auth.log:ro
+      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+      - /usr/local/etc/xray/config.json:/etc/xray/config.json:rw
+      - /proc/1/net/tcp6:/host_net/tcp6:ro
+    networks:
+      ailab:

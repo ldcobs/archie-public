@@ -1,0 +1,29 @@
+name: Feature Request
+description: Suggest an improvement or new capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Describe the problem you're trying to solve — that's more useful than a pre-decided solution.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that's hard or impossible today?
+      placeholder: I manage keys for 40 users and there's no way to bulk-disable a group at once.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Optional. How you imagine it working.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Roughly how many users, what network conditions, what you do today as a workaround.
+    validations:
+      required: false

@@ -1,0 +1,51 @@
+services:
+  vpn-api-v3:
+    image: python:3.12-slim
+    container_name: vpn-api-v3
+    restart: unless-stopped
+    command: python3 /app/vpn-api.py
+    environment:
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - API_AUTH_TOKEN=${VPN_API_V3_TOKEN:-}
+      - ALLOWED_ORIGINS=${VPN_API_V3_ORIGINS:-}
+      - XRAY_BIN=/usr/local/bin/xray
+      - VLESS_PBK=${VLESS_PBK:-}
+      - VLESS_SID=${VLESS_SID:-}
+      - VLESS_SNI=${VLESS_SNI:-}
+    volumes:
+      - ../../api:/app
+      - /usr/local/bin/xray:/usr/local/bin/xray:ro
+      - /var/log/xray:/var/log/xray:ro
+      - /var/log/auth.log:/var/log/auth.log:ro
+      - /usr/local/etc/xray/config.json:/etc/xray/config.json:rw
+      - /proc/1/net/tcp6:/host_net/tcp6:ro
+      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+    ports:
+      - "127.0.0.1:5901:5900"
+
+  vpn-dashboard-v3:
+    build:
+      context: ../../dashboard
+      dockerfile: Dockerfile
+    container_name: vpn-dashboard-v3
+    restart: unless-stopped
+    environment:
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - NEXT_PUBLIC_BASE_PATH=/v3
+      - NEXT_PUBLIC_SECURITY_PAGE_PATH=/security-review
+      - XRAY_CFG=/etc/xray/config.json
+      - PENDING_CFG=/app/vpn-api/pending_config.json
+      - STATE_DIR=/app/vpn-api
+      - DATA_DIR=/app/data
+      - LOG_ACCESS=/var/log/xray/access.log
+      - LOG_AUTH=/var/log/auth.log
+      - LOG_F2B=/var/log/fail2ban.log
+      - HOST_TCP6=/host_net/tcp6
+    volumes:
+      - ../../api:/app/vpn-api
+      - ../../dashboard/data:/app/data
+      - /var/log/xray:/var/log/xray:ro
+      - /var/log/auth.log:/var/log/auth.log:ro
+      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+      - /usr/local/etc/xray/config.json:/etc/xray/config.json:rw
+      - /proc/1/net/tcp6:/host_net/tcp6:ro

@@ -1,0 +1,63 @@
+name: Bug Report
+description: Something in Archie doesn't work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please **redact all secrets** (tokens, keys,
+        passwords, real client IPs) from anything you paste below.
+        For security vulnerabilities, do **not** use this form — see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what happened instead?
+      placeholder: The setup wizard reported "Dashboard responds" failed, but the dashboard loads fine in my browser.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps, in order, that lead to the problem.
+      placeholder: |
+        1. Ran the install one-liner
+        2. Picked Direct mode
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Install mode
+      options:
+        - Direct
+        - CDN-fronted
+        - Direct-TLS
+        - Not sure / didn't get that far
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Archie version
+      description: The version you installed (e.g. v0.1.5). Shown by the installer and in the dashboard.
+      placeholder: v0.1.5
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Server OS / VPS provider
+      description: e.g. "Ubuntu 24.04 on Hetzner CX22"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Installer output, dashboard errors, or container logs. Secrets redacted.
+      render: shell
+    validations:
+      required: false

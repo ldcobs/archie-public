@@ -1,0 +1,138 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* ── Core palette ── */
+  --bg:             #080c10;
+  --surface:        #0d1117;
+  --surface-sidebar: #070d18;
+  --surface-hover:  rgba(255,255,255,0.025);
+  --surface-active: rgba(0,212,255,0.04);
+  --border:         #1a2332;
+  --border-subtle:  rgba(255,255,255,0.06);
+
+  /* ── Brand ── */
+  --accent:         #00d4ff;
+  --accent-dim:     rgba(0,212,255,0.15);
+  --accent-glow:    rgba(0,212,255,0.30);
+
+  /* ── Semantic ── */
+  --green:          #39d353;
+  --green-dim:      rgba(57,211,83,0.12);
+  --green-glow:     rgba(57,211,83,0.30);
+  --red:            #ff4444;
+  --red-dim:        rgba(255,68,68,0.12);
+  --yellow:         #f0e050;
+  --yellow-dim:     rgba(240,224,80,0.12);
+  --amber:          #f0a500;
+  --amber-dim:      rgba(240,165,0,0.12);
+  --purple:         #bd93f9;
+  --purple-dim:     rgba(189,147,249,0.12);
+
+  /* ── Text ── */
+  --text:           #c9d1d9;
+  --text-bright:    #dce8f7;
+  --text-dim:       rgba(184,199,219,0.68);
+  --text-faint:     rgba(184,199,219,0.46);
+  --muted:          #4a5568;
+
+  /* ── Radius ── */
+  --r-xs:  3px;
+  --r-sm:  4px;
+  --r-md:  6px;
+  --r-lg:  8px;
+  --r-xl:  10px;
+  --r-xxl: 14px;
+
+  /* ── Spacing ── */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-7:  28px;
+  --sp-8:  32px;
+
+  /* ── Chart/grid tokens (theme-aware) ── */
+  --grid-line:   rgba(255,255,255,0.06);
+  --axis-text:   rgba(180,195,215,0.30);
+  --axis-text-2: rgba(180,195,215,0.28);
+}
+
+/* ── Light theme overrides ─────────────────────────────────────────────────── */
+/* Applied when <html data-theme="light">. Dark is the default (:root above) and
+   is NOT modified. Every token that has a visual meaning on a light surface is
+   overridden here; semantic accents (green/red/amber/purple) are kept close to
+   their dark values but tuned for contrast on white. The scanline CRT overlay
+   and neon glows are disabled in light mode (body::before override below). */
+[data-theme="light"] {
+  --bg:             #f0f2f6;
+  --surface:        #ffffff;
+  --surface-sidebar: #e6e9f0;
+  --surface-hover:  rgba(0,0,0,0.025);
+  --surface-active: rgba(0,102,204,0.05);
+  --border:         #dde1ea;
+  --border-subtle:  rgba(0,0,0,0.06);
+
+  --accent:         #0055b3;
+  --accent-dim:     #dbeafe;
+  --accent-glow:    rgba(0,85,179,0.22);
+
+  --green:          #15803d;
+  --green-dim:      #dcfce7;
+  --green-glow:     rgba(21,128,61,0.22);
+
+  --red:            #b91c1c;
+  --red-dim:        #fee2e2;
+
+  --yellow:         #92400e;
+  --yellow-dim:     #fef9c3;
+
+  --amber:          #b45309;
+  --amber-dim:      #fef3c7;
+
+  --purple:         #6d28d9;
+  --purple-dim:     #ede9fe;
+
+  --text:           #1f2937;
+  --text-bright:    #0d1117;
+  --text-dim:       #4b5a6e;
+  --text-faint:     #7a8a9c;
+  --muted:          #9ca3af;
+
+  --grid-line:   rgba(0,0,0,0.07);
+  --axis-text:   rgba(60,75,95,0.45);
+  --axis-text-2: rgba(60,75,95,0.40);
+}
+
+/* Disable the CRT scanline overlay in light mode — it's a dark-mode aesthetic
+   and reads as broken banding on white. Dark mode keeps it. */
+[data-theme="light"] body::before {
+  display: none;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,.012) 2px, rgba(0,212,255,.012) 4px);
+  pointer-events: none;
+  z-index: 999;
+}
+
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+@keyframes fadeIn { from { opacity: 0; transform: translateX(-3px); } to { opacity: 1; transform: translateX(0); } }

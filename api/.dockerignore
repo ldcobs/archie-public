@@ -1,0 +1,5 @@
+# Never bake runtime state, caches, or logs into the API image (Option B).
+__pycache__/
+*.pyc
+*.json
+*.log

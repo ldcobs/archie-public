@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Archie setup</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121821; --panel2:#0e141c; --line:#1f2a37;
+    --text:#e6edf3; --muted:#8b98a5; --faint:#5b6775;
+    --accent:#3b82f6; --accent-bg:#11233f; --green:#22c55e; --green-bg:#0f2417;
+    --amber:#f59e0b; --amber-bg:#2a1f06; --red:#ef4444; --red-bg:#2a1112;
+    --radius:8px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:720px;margin:0 auto;padding:28px 18px 60px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .hd{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .hd b{font-weight:600}
+  .dots{margin-left:auto;display:flex;gap:5px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--line)}
+  .dot.on{background:var(--accent)}
+  .dot.done{background:var(--green)}
+  .body{padding:22px;min-height:300px}
+  .ft{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-top:1px solid var(--line)}
+  h2{margin:0 0 6px;font-size:19px;font-weight:600}
+  .sub{color:var(--muted);margin:0 0 16px;font-size:13px}
+  button{font:inherit;cursor:pointer;border-radius:var(--radius);border:1px solid var(--line);
+    background:transparent;color:var(--text);padding:8px 16px}
+  button:hover{border-color:#33414f}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.ghost{border:none;color:var(--muted)}
+  button:disabled{opacity:.4;cursor:default}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .tile{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px}
+  .tile .k{font-size:11px;color:var(--muted)}
+  .tile .v{font-size:16px;font-weight:600;margin-top:2px}
+  .row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .row .lbl{flex:1}
+  .row .det{font-size:12px;color:var(--muted)}
+  .pill{font-size:11px;padding:2px 9px;border-radius:99px}
+  .p-pass{color:var(--green);background:var(--green-bg)}
+  .p-install{color:var(--accent);background:var(--accent-bg)}
+  .p-warn{color:var(--amber);background:var(--amber-bg)}
+  .p-action{color:var(--amber);background:var(--amber-bg)}
+  .pick{display:block;border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px;margin-bottom:9px;cursor:pointer}
+  .pick.sel{border-color:var(--accent);background:var(--accent-bg)}
+  .pick.disabled{opacity:.5;cursor:not-allowed}
+  .pick.disabled .badge{color:var(--faint);background:var(--panel2)}
+  .pick .t{font-weight:600}
+  .pick .d{font-size:12px;color:var(--muted);margin-top:2px}
+  .badge{display:inline-block;vertical-align:middle;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);background:var(--accent-bg);padding:2px 8px;border-radius:99px;margin-left:8px}
+  .pick .t{display:flex;align-items:center;gap:2px}
+  input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+    color:var(--text);padding:9px 11px;font:inherit;margin-bottom:10px}
+  .note{font-size:12.5px;border-radius:var(--radius);padding:10px 12px;margin:10px 0}
+  .note.warn{background:var(--amber-bg);color:var(--amber)}
+  .note.ok{background:var(--green-bg);color:var(--green)}
+  .toggle{width:38px;height:21px;border-radius:99px;background:var(--line);position:relative;cursor:pointer;flex:0 0 auto}
+  .toggle.on{background:var(--accent)}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;transition:left .12s}
+  .toggle.on .knob{left:19px}
+  .intg{border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px;margin-bottom:9px}
+  .intg.on{border-color:var(--accent)}
+  .steplog{font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
+  .bar{height:7px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:6px 0 14px}
+  .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+  .st-pending{color:var(--faint)} .st-running{color:var(--accent)} .st-done{color:var(--green)} .st-failed{color:var(--red)}
+  .recov{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
+  a{color:var(--accent)}
+  table{width:100%;font-size:13px;border-collapse:collapse}
+  td{padding:5px 0} td.r{text-align:right;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="hd"><span>🛡</span> <b>Archie setup</b><span class="dots" id="dots"></span></div>
+    <div class="body" id="body"></div>
+    <div class="ft">
+      <button class="ghost" id="back">Back</button>
+      <span class="det" id="label" style="font-size:12px;color:var(--faint)"></span>
+      <button class="primary" id="next">Next</button>
+    </div>
+  </div>
+</div>
+<script>
+let TOKEN = new URLSearchParams(location.search).get("token") || "";
+let authGateShown = false;
+// 20s: a busy/remote box can take a while to answer; the old 8s timeout
+// aborted routinely, and an aborted request looked identical to "still
+// installing" — the UI just froze with no error.
+const api = async (path, opts={}) => {
+  const u = path + (TOKEN ? (path.includes("?")?"&":"?")+"token="+encodeURIComponent(TOKEN) : "");
+  try {
+    const ctrl = new AbortController(); const t=setTimeout(()=>ctrl.abort(), 20000);
+    const r = await fetch(u, {headers:{"X-Archie-Token":TOKEN, "Content-Type":"application/json"}, signal:ctrl.signal, ...opts});
+    clearTimeout(t);
+    const body = await r.json().catch(()=>({}));
+    if(r.status===401){
+      // Every call was silently treated as success — the 401 JSON body
+      // flowed straight into the views and rendered as undefined/NaN with
+      // no indication auth was the problem. Gate the whole app instead.
+      renderAuthGate();
+      return {__error:true, __authRequired:true};
+    }
+    return body;
+  } catch(e){ return {__error:true}; }
+};
+function renderAuthGate(){
+  if(authGateShown) return;
+  authGateShown = true;
+  clearTimeout(S.jobTimer);
+  document.getElementById("body").innerHTML = `<h2>Access token required</h2>
+    <p class="sub">This installer is running in public mode. Paste the access token shown in the
+    terminal that started it (or from the original setup link).</p>
+    <input id="tokenInput" type="text" placeholder="Paste your token" autofocus
+      style="width:100%;padding:10px;font:inherit;box-sizing:border-box;margin:12px 0;">
+    <button class="primary" id="tokenSubmit">Continue</button>
+    <div id="tokenErr" class="note warn" style="display:none;margin-top:10px;">
+      That token didn't work — check it and try again.</div>`;
+  document.getElementById("label").textContent = "Access required";
+  document.getElementById("back").style.visibility = "hidden";
+  document.getElementById("next").style.display = "none";
+  const submit = async () => {
+    TOKEN = document.getElementById("tokenInput").value.trim();
+    const check = await api("/api/detect");
+    if(check.__authRequired){
+      document.getElementById("tokenErr").style.display = "block";
+      authGateShown = false; // allow the next failed attempt to re-show the form
+      return;
+    }
+    authGateShown = false;
+    document.getElementById("next").style.display = "";
+    S.facts = check.__error ? null : check;
+    S.pf = null; S.pfErr = null; // refetch with the now-valid token
+    render(); onEnterStep(curId());
+  };
+  document.getElementById("tokenSubmit").onclick = submit;
+  document.getElementById("tokenInput").onkeydown = e => { if(e.key==="Enter") submit(); };
+}
+const errBox = () => `<h2>Can't reach the installer service</h2>
+  <div class="note warn">This page is just the front-end. It needs the <b>archie-installer</b> service
+  running on the host. On the target server the bootstrap starts it for you; to preview locally:
+  <div class="steplog" style="margin-top:8px">python3 install/wizard/serve.py --port 8899</div>
+  then open <a href="http://localhost:8899">http://localhost:8899</a> (not the static file).</div>`;
+const esc = s => String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+const S = { step:0, facts:null, answers:{ mode:"A", domain:"", posture:"balanced",
+  cf_origin_cert:"", cf_origin_key:"",
+  integrations:{abuseipdb:false, telegram:false, smtp:false} }, jobTimer:null };
+
+// Modes that are actually built + live-validated. Mode B (Cloudflare) collects
+// the operator's Origin cert on the "Domain & cert" step below.
+const SUPPORTED_MODES = ["A", "B", "C"];
+
+// step ids; "domain" auto-skipped for mode A
+const STEPS = ["welcome","detect","preflight","mode","domain","posture","capacity","integrations","review","install","done"];
+const TITLE = {welcome:"Welcome",detect:"Detect host",preflight:"Preflight",mode:"Mode",domain:"Domain & cert",
+  posture:"Posture",capacity:"Capacity",integrations:"Integrations",review:"Review",install:"Install",done:"Done"};
+
+const pillClass = s => ({pass:"p-pass",install:"p-install",warn:"p-warn",action:"p-action"}[s]||"p-warn");
+const pillText  = s => ({pass:"present",install:"will install",warn:"check",action:"you must"}[s]||s);
+
+// Each integration: its OWN correct fields + accurate step-by-step setup.
+const INTG = {
+  abuseipdb: { name:"AbuseIPDB", rec:true,
+    desc:"IP reputation scoring. Off = free geo lookups only.",
+    fields:[{k:"key", ph:"API key"}],
+    steps:[
+      'Create a free account at <a href="https://www.abuseipdb.com/register" target="_blank">abuseipdb.com</a> and confirm your email.',
+      'Log in, then open <b>Account → API</b>.',
+      'Click <b>Create Key</b>, give it a name, and copy the key it shows.',
+      'Paste the key below and press <b>Test</b>.' ]},
+  telegram: { name:"Telegram alerts", rec:true,
+    desc:"Get a Telegram message when something needs your attention.",
+    fields:[{k:"token", ph:"Bot token"}, {k:"chat", ph:"Chat ID"}],
+    steps:[
+      'In Telegram, open <a href="https://t.me/BotFather" target="_blank">@BotFather</a> and send <b>/newbot</b>.',
+      'Give the bot a display name, then a username that <b>must end in “bot”</b> (e.g. <code>my_archie_bot</code>).',
+      'BotFather replies with a <b>token</b> like <code>123456:ABC-xyz…</code> — copy it into <b>Bot token</b>.',
+      'Open <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>, send it anything; it replies with your <b>numeric chat ID</b> — copy it into <b>Chat ID</b>.',
+      'Open <b>your new bot</b> (search its @username) and press <b>Start</b> — Telegram blocks a bot from messaging you until you have started a chat with it.',
+      'Press <b>Test</b> — your bot should message you.' ]},
+  smtp: { name:"Email invites (SMTP)", rec:false,
+    desc:"Send invites by email. Invites still work via link/QR if this is off. This is NOT an API key — it's your mail server settings.",
+    fields:[{k:"host", ph:"SMTP host (e.g. smtp.gmail.com)"}, {k:"port", ph:"Port (465 or 587)"},
+            {k:"user", ph:"Username"}, {k:"pass", ph:"Password / app password"}, {k:"from", ph:'From (e.g. VPN &lt;you@site.com&gt;)'}],
+    steps:[
+      'Use your email provider’s SMTP host + port (465 = SSL, 587 = STARTTLS).',
+      'Gmail: turn on 2-step verification, then create an <a href="https://myaccount.google.com/apppasswords" target="_blank">App Password</a> and use that 16-character value as the password.',
+      'No mail server? Sign up for a free relay (Brevo, SendGrid, Mailgun) and use the SMTP credentials they give you.',
+      'Fill the fields and press <b>Test</b> to send yourself a message.' ]},
+};
+
+const views = {
+  welcome: () => `<h2>Let's set up your VPN</h2>
+    <p class="sub">This wizard detects your host, guides a few decisions, and installs Archie.
+    Nothing on the system changes until you confirm at Review.</p>
+    <div class="note ok">${/^(127\.0\.0\.1|localhost|\[?::1\]?)$/.test(location.hostname)
+        ? 'The installer is private — bound to localhost, reached over your SSH tunnel.'
+        : 'Reached over a temporary public URL, gated by the one-time token in your address bar. It is only exposed while this wizard is running — finish setup and it goes away.'}</div>`,
+
+  detect: () => { const f=S.facts; if(!f) return `<p class="sub">Detecting…</p>`;
+    if(f.__error) return errBox();
+    return `<h2>This host</h2><div class="grid">
+      <div class="tile"><div class="k">OS</div><div class="v">${esc(f.os_id||"?")} ${esc(f.os_version)}</div></div>
+      <div class="tile"><div class="k">CPU / RAM</div><div class="v">${f.cpu} cores · ${(f.mem_total_mb/1024).toFixed(1)} GB</div></div>
+      <div class="tile"><div class="k">Disk</div><div class="v">${f.disk_free_gb} GB free</div></div>
+      <div class="tile"><div class="k">Public IP</div><div class="v">${esc(f.public_ip||"—")}</div></div>
+    </div>`; },
+
+  preflight: () => { if(S.pfErr) return errBox(); const c=S.pf; if(!c) return `<p class="sub">Checking…</p>`;
+    return `<h2>Preflight checks</h2><p class="sub">We adapt the install to what you have. Nothing changes yet.</p>`
+      + c.map(x => x.status==="action"
+          // action rows (e.g. cloud security group) carry a multi-line, per-mode
+          // detail — give it a full-width stacked block with preserved line
+          // breaks instead of cramming a paragraph into the middle column.
+          ? `<div class="row" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px 0">
+               <div style="display:flex;align-items:center;gap:10px">
+                 <span class="lbl" style="flex:1;font-weight:600">${esc(x.label)}</span>
+                 <span class="pill ${pillClass(x.status)}">${pillText(x.status)}</span>
+               </div>
+               <span class="det" style="white-space:pre-line;line-height:1.65">${esc(x.detail)}</span>
+             </div>`
+          : `<div class="row"><span class="lbl">${esc(x.label)}</span>
+               <span class="det">${esc(x.detail)}</span>
+               <span class="pill ${pillClass(x.status)}">${pillText(x.status)}</span></div>`
+        ).join(""); },
+
+  mode: () => `<h2>How should clients reach your VPN?</h2>
+    <p class="sub">All three modes work today. Pick the one that matches your domain setup.</p>
+    ${[["A","IP only (no domain)","Works now — the VPN runs and the dashboard opens in your browser at http://&lt;server-ip&gt;:8080/v3. No domain needed.","simplest"],
+       ["C","Domain + Let's Encrypt","Best for production — needs a domain that resolves to this server. Free certificate, issued automatically.","recommended"],
+       ["B","Domain + Cloudflare","CDN-fronted setup — needs a domain proxied through Cloudflare + an Origin cert (you paste it next).","advanced"]]
+      .map(([m,t,d,badge])=>{ const ok=SUPPORTED_MODES.includes(m);
+        return `<label class="pick ${S.answers.mode===m?"sel":""} ${ok?"":"disabled"}" ${ok?`data-mode="${m}"`:""}>
+        <div class="t"><span class="t-label">${t}</span>${badge?' <span class="badge">'+badge+'</span>':""}</div><div class="d">${d}</div></label>`; }).join("")}`,
+
+  domain: () => `<h2>Your domain${S.answers.mode==="B"?" &amp; Cloudflare Origin cert":""}</h2>
+    <input type="text" id="domain" placeholder="vpn.example.com" value="${esc(S.answers.domain)}" />
+    ${S.answers.mode==="C" ? `<div class="note warn">If the domain doesn't point here yet, add a DNS A record
+      <b>→ ${esc(S.facts?S.facts.public_ip:"<server IP>")}</b>. The installer re-checks every 15s and
+      issues the Let's Encrypt certificate automatically.</div>` : ""}
+    ${S.answers.mode==="B" ? `
+    <div class="note warn" style="margin:12px 0;line-height:1.55">
+      <b>Two quick things to set up in Cloudflare first</b> — both free, about 2 minutes. Open your
+      <a href="https://dash.cloudflare.com/?to=/:account/:zone/dns" target="_blank" rel="noopener">Cloudflare dashboard</a>
+      and select the zone for this domain.
+      <div style="margin-top:10px"><b>1 · Point the domain at this server (Proxied)</b></div>
+      <ol style="margin:4px 0 0 20px;padding:0">
+        <li><b>DNS → Records → Add record</b>.</li>
+        <li>Type <b>A</b>; Name = your subdomain; IPv4 address = <b>${esc(S.facts?S.facts.public_ip:"<server IP>")}</b>.</li>
+        <li>Set <b>Proxy status</b> to <b>Proxied</b> (orange cloud) → <b>Save</b>.</li>
+      </ol>
+      <div style="margin-top:10px"><b>2 · Create &amp; download an Origin certificate</b>
+        (<a href="https://dash.cloudflare.com/?to=/:account/:zone/ssl-tls/origin" target="_blank" rel="noopener">SSL/TLS → Origin Server</a>)</div>
+      <ol style="margin:4px 0 0 20px;padding:0">
+        <li><b>Create Certificate</b> → keep the defaults → <b>Create</b>.</li>
+        <li>Two boxes appear. Copy or <b>download</b> both — the <b>Origin Certificate</b> and the
+          <b>Private Key</b>. The private key is shown only once, so grab it now.</li>
+        <li>Set <a href="https://dash.cloudflare.com/?to=/:account/:zone/ssl-tls" target="_blank" rel="noopener">SSL/TLS</a>
+          encryption mode to <b>Full (strict)</b>.</li>
+      </ol>
+      <div style="margin-top:10px">Then <b>upload the two files below</b> (or paste their contents).</div>
+    </div>
+    <label class="lbl" style="display:block;margin:10px 0 4px;font-size:13px">Origin certificate (PEM) — starts with <code>-----BEGIN CERTIFICATE-----</code></label>
+    <input type="file" id="cfcertfile" accept=".pem,.crt,.cer,.txt,application/x-pem-file,text/plain" style="display:block;margin-bottom:6px;font-size:12px" />
+    <textarea id="cfcert" rows="6" placeholder="Upload the .pem above, or paste here&#10;-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+      style="width:100%;font-family:var(--mono,monospace);font-size:11px;box-sizing:border-box">${esc(S.answers.cf_origin_cert)}</textarea>
+    <label class="lbl" style="display:block;margin:10px 0 4px;font-size:13px">Private key (PEM) — starts with <code>-----BEGIN PRIVATE KEY-----</code></label>
+    <input type="file" id="cfkeyfile" accept=".pem,.key,.txt,application/x-pem-file,text/plain" style="display:block;margin-bottom:6px;font-size:12px" />
+    <textarea id="cfkey" rows="6" placeholder="Upload the key file above, or paste here&#10;-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+      style="width:100%;font-family:var(--mono,monospace);font-size:11px;box-sizing:border-box">${esc(S.answers.cf_origin_key)}</textarea>
+    <div class="det" id="cferr" style="font-size:12px;margin-top:6px;color:var(--red)"></div>` : ""}`,
+
+  posture: () => `<h2>Starting security posture</h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      ${["strict","balanced","open"].map(p=>`<span class="pick ${S.answers.posture===p?"sel":""}"
+        data-posture="${p}" style="margin:0;padding:6px 14px;text-transform:capitalize">${p}${p==="balanced"?'<span class="badge">recommended</span>':""}</span>`).join("")}</div>
+    <p class="sub"><b>Balanced</b> flags a key only when it's active on 2+ networks at once, reviews brand-new
+    ISPs, and applies a traffic cap. Change it anytime in <b>Settings → Security Policy</b>.</p>`,
+
+  capacity: () => { const f=S.facts||{cpu:0,mem_total_mb:0};
+    const base=Math.max(10, Math.min(f.cpu*40, Math.floor(f.mem_total_mb/40)));
+    const light=base, mixed=Math.round(base*0.66), heavy=Math.round(base*0.27);
+    return `<h2>What this host can handle</h2>
+    <p class="sub">Same estimate shown later in the dashboard's Server Capacity panel.</p>
+    <div class="grid">
+      <div class="tile" style="text-align:center"><div class="v" style="color:var(--green);font-size:24px">${light}</div><div class="k">Light · browsing</div></div>
+      <div class="tile" style="text-align:center"><div class="v" style="color:var(--green);font-size:24px">${mixed}</div><div class="k">Mixed · streaming</div></div>
+      <div class="tile" style="text-align:center"><div class="v" style="color:var(--green);font-size:24px">${heavy}</div><div class="k">Heavy · 4K</div></div>
+    </div>
+    <p class="sub" style="margin-top:10px">Port speed and devices-per-user are the real ceiling. Informational — tune later in the dashboard.</p>`; },
+
+  integrations: () => { const I=S.answers.integrations;
+    const stepLine = (n,html)=>`<div style="display:flex;gap:9px;margin-bottom:7px">
+        <span style="flex:0 0 18px;height:18px;border-radius:50%;background:var(--accent-bg);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center">${n}</span>
+        <div style="font-size:12.5px;line-height:1.5">${html}</div></div>`;
+    const card=k=>{ const c=INTG[k], on=I[k];
+      return `<div class="intg ${on?"on":""}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="flex:1;font-weight:600">${c.name}${c.rec?'<span class="badge">recommended</span>':""}</span>
+          ${on?'<span class="det" style="color:var(--green);font-size:11px">enabled</span>':""}
+          <span class="toggle ${on?"on":""}" data-intg="${k}"><span class="knob"></span></span>
+        </div>
+        ${on?`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px;margin:10px 0">
+            ${c.steps.map((s,i)=>stepLine(i+1,s)).join("")}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${c.fields.map(f=>`<input type="text" placeholder="${f.ph}" data-field="${k}:${f.k}" style="margin:0;flex:1 1 150px">`).join("")}
+            <button data-test="${k}" style="flex:0 0 auto">Test</button></div>
+          <div class="det" id="test-${k}" style="font-size:11px;margin-top:6px"></div>`
+          :`<div class="d" style="font-size:12px;color:var(--muted);margin-top:4px">${c.desc}</div>`}
+      </div>`; };
+    return `<h2>Optional integrations</h2>
+      <p class="sub">Turn on any or all. Each opens step-by-step setup and its own Test — you stay on this step. Off is fine; add later in Settings.</p>
+      ${["abuseipdb","telegram","smtp"].map(card).join("")}`; },
+
+  review: () => { const a=S.answers, I=a.integrations;
+    const on=Object.keys(I).filter(k=>I[k]).join(", ")||"none";
+    return `<h2>Review — nothing has changed yet</h2>
+    <p class="sub">The package is downloaded and this installer is running, but no system install/config has happened.</p>
+    <table>
+      <tr><td>Mode</td><td class="r">${({A:"IP only",B:"Domain + Cloudflare",C:"Domain + Let's Encrypt"})[a.mode]}</td></tr>
+      ${a.mode!=="A"?`<tr><td>Domain</td><td class="r">${esc(a.domain)}</td></tr>`:""}
+      <tr><td>Posture</td><td class="r" style="text-transform:capitalize">${a.posture}</td></tr>
+      <tr><td>Integrations</td><td class="r">${esc(on)}</td></tr>
+      <tr><td>Install to</td><td class="r">/opt/archie (user: archie)</td></tr>
+    </table>`; },
+
+  install: () => { const j=S.job;
+    if(j && j.state==="unsupported") return `<h2>Not available yet</h2>
+      <div class="note warn">${esc(j.reason||"This mode isn't available in this build.")}</div>
+      <div class="recov"><button class="primary" data-act="tomode">Back to Mode</button></div>`;
+    if(!j||j.state==="none"||(!j.steps && j.state!=="verifying")) return `<h2>Installing…</h2><p class="sub">Starting…</p>`;
+    const steps=j.steps||[];
+    const done=steps.filter(s=>s.status==="done").length, pct=steps.length?Math.round(done/steps.length*100):0;
+    const failedIdx=steps.findIndex(s=>s.status==="failed");
+    const mark=s=>({done:"[+]",running:"[*]",failed:"[x]"}[s]||"[ ]");
+    const title = j.state==="failed"?"Install failed"
+      : j.state==="verify-failed"?"Installed — verification issues"
+      : j.state==="verifying"?"Re-checking…"
+      : j.state==="done"?"Installed ✓" : (j.real?"Installing…":"Installing… (preview)");
+    let html = `<h2>${title}</h2><div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="steplog">${steps.map(s=>`<div class="st-${s.status}">${mark(s.status)} ${esc(s.desc)}</div>`).join("")}</div>`;
+    if(j.verify) html += `<div style="margin-top:14px;font-weight:600;font-size:13px">Verification</div>
+      <div class="steplog">${j.verify.map(v=>`<div class="st-${v.ok?"done":"failed"}">${v.ok?"[+]":"[x]"} ${esc(v.label)}${v.detail?" ("+esc(v.detail)+")":""}</div>`).join("")}</div>`;
+
+    // ── failure recovery ─────────────────────────────────────────────────────
+    if(j.state==="failed"){
+      const where = failedIdx>=0
+        ? `Stopped at step ${failedIdx+1} of ${steps.length}: <b>${esc(steps[failedIdx].desc)}</b>. ` : "";
+      html += `<div class="note warn">${where}${esc(j.reason||"A step failed.")}<br>
+        Read the log below to find the cause. <b>Retry</b> resumes where it stopped — completed steps are
+        detected and skipped, so it's safe to run again.</div>
+        <div class="recov"><button class="primary" data-act="retry">Retry install</button>
+        <button data-act="restart">Back to Review</button></div>`;
+    }
+    if(j.state==="verify-failed"){
+      const nbad = j.verify ? j.verify.filter(v=>!v.ok).length : 0;
+      html += `<div class="note warn">The install finished, but ${nbad||"some"} check${nbad===1?"":"s"} didn't pass.
+        This is often a service still warming up or a cloud port that isn't open yet.
+        Wait a few seconds and re-check, or continue and verify from the dashboard.</div>
+        <div class="recov"><button class="primary" data-act="reverify">Re-run verification</button>
+        <button data-act="retry">Retry install</button>
+        <button class="ghost" data-act="continue">Continue anyway →</button></div>`;
+    }
+    if(j.note) html += `<p class="sub" style="margin-top:10px">${esc(j.note)}</p>`;
+    if(j.state==="running"||j.state==="verifying") html += `<p class="sub" style="margin-top:10px">This can take several minutes on a fresh host.</p>`;
+    const tokq = TOKEN?("&token="+encodeURIComponent(TOKEN)):"";
+    const logOpen = ["running","verifying","failed"].includes(j.state);
+    html += `<details ${logOpen?"open":""} style="margin-top:14px">
+      <summary style="cursor:pointer;color:var(--accent);font-size:13px">Install log</summary>
+      <pre class="steplog" id="logpane" style="white-space:pre-wrap;max-height:260px;overflow:auto;margin-top:8px;background:var(--panel2);padding:10px;border-radius:var(--radius)">${esc(S.log||"…")}</pre>
+      <a href="/api/log?raw=1${tokq}" download="archie-install.log" style="font-size:12px">Download full log</a></details>`;
+    return html; },
+
+  done: () => { const a=S.answers;
+    const ip = S.facts && S.facts.public_ip ? S.facts.public_ip : "<server-ip>";
+    const url = a.mode==="A" ? "http://"+esc(ip)+":8080/v3" : "https://"+esc(a.domain)+":8443/v3";
+    return `<h2 style="color:var(--green)">✓ Archie is live</h2>
+      <p class="sub">Open <b>${url}</b> and create your owner account (you choose the password). There is no default password.</p>`; },
+};
+
+function curId(){ return STEPS[S.step]; }
+function renderDots(){
+  const d=document.getElementById("dots"); d.innerHTML="";
+  STEPS.forEach((_,n)=>{ const e=document.createElement("span");
+    e.className="dot "+(n<S.step?"done":n===S.step?"on":""); d.appendChild(e); });
+}
+function render(){
+  if(authGateShown) return;
+  const id=curId();
+  document.getElementById("body").innerHTML=views[id]();
+  renderDots();
+  document.getElementById("label").textContent=`Step ${S.step+1} of ${STEPS.length} · ${TITLE[id]}`;
+  document.getElementById("back").style.visibility=S.step===0?"hidden":"visible";
+  const nx=document.getElementById("next");
+  nx.textContent = id==="review"?"Install" : id==="install"?"…" : id==="done"?"Finish" : "Next";
+  nx.disabled = id==="install" && (!S.job || S.job.state!=="done");
+  wire(id);
+}
+function wire(id){
+  if(id==="install") document.querySelectorAll("[data-act]").forEach(el=>el.onclick=()=>{
+    const a=el.dataset.act;
+    if(a==="retry") startInstall();
+    else if(a==="reverify") reverify();
+    else if(a==="continue") go(1);
+    else if(a==="restart"){ S.installStarted=false; clearTimeout(S.jobTimer); S.step=STEPS.indexOf("review"); render(); }
+    else if(a==="tomode"){ S.installStarted=false; clearTimeout(S.jobTimer); S.step=STEPS.indexOf("mode"); render(); }
+  });
+  if(id==="mode") document.querySelectorAll("[data-mode]").forEach(el=>el.onclick=()=>{S.answers.mode=el.dataset.mode;render();});
+  if(id==="posture") document.querySelectorAll("[data-posture]").forEach(el=>el.onclick=()=>{S.answers.posture=el.dataset.posture;render();});
+  if(id==="domain") {
+    const i=document.getElementById("domain"); if(i) i.oninput=()=>S.answers.domain=i.value.trim();
+    const c=document.getElementById("cfcert"); if(c) c.oninput=()=>S.answers.cf_origin_cert=c.value;
+    const k=document.getElementById("cfkey");  if(k) k.oninput=()=>S.answers.cf_origin_key=k.value;
+    // Let the operator upload the .pem/.key files Cloudflare hands them instead
+    // of copy-pasting. Read client-side into the same answer fields + mirror
+    // into the textarea, so the install payload is unchanged (no upload endpoint).
+    const bindPem=(fileId,field,taId)=>{ const f=document.getElementById(fileId); if(!f) return;
+      f.onchange=()=>{ const file=f.files&&f.files[0]; if(!file) return;
+        const r=new FileReader();
+        r.onload=()=>{ const txt=String(r.result||"").trim(); S.answers[field]=txt;
+          const ta=document.getElementById(taId); if(ta) ta.value=txt;
+          const err=document.getElementById("cferr"); if(err) err.textContent=""; };
+        r.readAsText(file); }; };
+    bindPem("cfcertfile","cf_origin_cert","cfcert");
+    bindPem("cfkeyfile","cf_origin_key","cfkey");
+  }
+  if(id==="integrations"){
+    document.querySelectorAll("[data-intg]").forEach(el=>el.onclick=()=>{
+      const k=el.dataset.intg; S.answers.integrations[k]=!S.answers.integrations[k]; render(); });
+    document.querySelectorAll("[data-test]").forEach(el=>el.onclick=async()=>{
+      const k=el.dataset.test, out=document.getElementById("test-"+k);
+      const vals={}; document.querySelectorAll('[data-field^="'+k+':"]').forEach(inp=>vals[inp.dataset.field.split(":")[1]]=inp.value.trim());
+      if(Object.values(vals).some(v=>!v)){ out.textContent="Fill every field above first."; out.style.color="var(--amber)"; return; }
+      out.textContent="testing…"; out.style.color="var(--muted)";
+      const r=await api("/api/test-integration",{method:"POST",body:JSON.stringify({key:k,vals})});
+      out.textContent = r.ok?"✓ "+r.message:"✗ "+(r.message||"failed"); out.style.color=r.ok?"var(--green)":"var(--red)"; });
+  }
+}
+function pollJob(){
+  clearTimeout(S.jobTimer);
+  // Self-scheduling setTimeout, not setInterval: a slow/remote box previously
+  // let requests pile up because setInterval doesn't wait for the previous
+  // tick to finish. Each tick only schedules the next one after it completes.
+  const tick = async () => {
+    const job = await api("/api/job");
+    if(job.__authRequired) return; // auth gate is already showing
+    if(!job.__error){
+      S.job = job;
+      // Incremental log fetch: previously re-fetched the entire (up to 40KB)
+      // log every 900ms regardless of size. Now only the bytes since the
+      // last-seen offset are requested.
+      const lg = await api("/api/log?since=" + (S.logOffset||0));
+      if(lg && !lg.__error){ S.log = (S.log||"") + (lg.log||""); S.logOffset = lg.total||S.logOffset||0; }
+      render();
+    }
+    if(S.job && ["done","failed","verify-failed","unsupported"].includes(S.job.state)) return;
+    S.jobTimer = setTimeout(tick, 1200);
+  };
+  tick();
+}
+async function startInstall(){            // run / retry the install (retry resumes)
+  S.job={state:"running"}; S.log=""; S.logOffset=0; render();
+  await api("/api/install",{method:"POST",body:JSON.stringify(S.answers)});
+  pollJob();
+}
+async function reverify(){                // re-run the read-only self-check only
+  S.job={...S.job, state:"verifying"}; render();
+  await api("/api/verify",{method:"POST",body:"{}"});
+  pollJob();
+}
+let pageLoadJobChecked = false; // survives the whole page lifetime; NOT reset by restart/retry
+async function onEnterStep(id){
+  if(id==="detect" && !S.facts){ S.facts=await api("/api/detect"); render(); }
+  if(id==="preflight" && !S.pf && !S.pfErr){ const r=await api("/api/preflight"); if(r.__error) S.pfErr=true; else S.pf=r.checks; render(); }
+  if(id==="install"){
+    // On a page refresh (or first-ever arrival) check the server for a job
+    // that already exists before deciding to start a new one — previously
+    // every refresh blindly re-POSTed /api/install even if a job was already
+    // running or finished. Deliberate restarts/retries within the same page
+    // session skip this (pageLoadJobChecked is only false once) and keep the
+    // existing "POST a fresh job" behavior.
+    if(!pageLoadJobChecked){
+      pageLoadJobChecked = true;
+      const existing = await api("/api/job");
+      if(existing && !existing.__error && existing.state && existing.state!=="none"){
+        S.installStarted = true; S.job = existing; render();
+        if(["running","verifying"].includes(existing.state)) pollJob();
+        return;
+      }
+    }
+    if(!S.installStarted){ S.installStarted=true; startInstall(); }
+    else if(S.job && (S.job.state==="running"||S.job.state==="verifying")){ pollJob(); }
+  }
+}
+function go(d){
+  // Gate leaving the domain step forward: B/C need a domain; B also needs a
+  // valid-looking Origin cert + key (the install engine can't proceed without
+  // them, so catch it here rather than after a doomed run starts).
+  if(d>0 && curId()==="domain"){
+    const a=S.answers, err=document.getElementById("cferr");
+    const fail=m=>{ if(err){err.textContent=m;} else {alert(m);} };
+    if(a.mode!=="A" && !a.domain){ fail("Enter your domain first."); return; }
+    if(a.mode==="B"){
+      if(!/-----BEGIN CERTIFICATE-----/.test(a.cf_origin_cert)){ fail("Paste the Origin certificate (PEM) — it should start with -----BEGIN CERTIFICATE-----."); return; }
+      if(!/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(a.cf_origin_key)){ fail("Paste the private key (PEM) — it should start with -----BEGIN PRIVATE KEY-----."); return; }
+    }
+    if(err) err.textContent="";
+  }
+  let n=S.step+d;
+  // skip the domain step for IP-only mode A
+  while(STEPS[n]==="domain" && S.answers.mode==="A") n+=d;
+  if(n<0||n>=STEPS.length){
+    if(STEPS[S.step]==="done"){
+      // Take the customer straight to the dashboard the "done" screen
+      // already told them to open, instead of reloading the wizard
+      // (which used to restart the whole flow from Welcome, step 1 -
+      // confusing enough that a customer clicking through fast would
+      // land right back on the Install step and think it "went back").
+      const a=S.answers;
+      const ip = (S.facts && S.facts.public_ip) || location.hostname;
+      location.href = a.mode==="A" ? "http://"+ip+":8080/v3" : "https://"+a.domain+":8443/v3";
+    }
+    return;
+  }
+  S.step=n; render(); onEnterStep(curId());
+}
+document.getElementById("next").onclick=()=>go(1);
+document.getElementById("back").onclick=()=>go(-1);
+render();
+</script>
+</body>
+</html>

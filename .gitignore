@@ -1,0 +1,70 @@
+.DS_Store
+*.tgz
+*.tar.gz
+
+# Root runtime / local-only state
+fixtures/vps-snapshot/
+
+# API mutable state
+api/*.json
+
+# Dashboard local runtime
+dashboard/.next/
+dashboard/node_modules/
+dashboard/.env.local
+dashboard/data/*.json
+!dashboard/.env.example
+!dashboard/.env.local.example
+!dashboard/next-env.d.ts
+!dashboard/data/.gitkeep
+!dashboard/data/README.md
+
+# Logs / caches
+*.log
+*.pid
+*.bak
+*.bak-*
+**/__pycache__/
+
+# Local checkpoint snapshots
+CHECKPOINT-*.md
+
+# IDE / tool local config (hidden per-tool directories)
+.*/
+!.github/
+
+# Local-only backups and design references (not shipped)
+backups/
+design/
+
+# Installer — local test artifacts and venv
+install/.venv/
+install/.staging/
+
+# Acceptance tests — isolated node_modules + reports
+tests/.venv/
+tests/report.html
+tests/e2e/node_modules/
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+
+# Python caches (installer + test suites)
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# build artifacts
+dist/
+build/.stage/
+
+# local Cloudflare Origin cert/key for Mode B testing — never commit (contains a private key)
+certs/
+
+# iCloud "conflicted copy" duplicates — this checkout lives under a synced
+# Documents folder, which re-generates files like "LICENSE 2", "route 3.ts",
+# "Dockerfile 2". These are how internal copies have leaked into the public
+# tree before. Never commit them; purge with:
+#   find . -path ./.git -prune -o -name '* [0-9].*' -print -delete
+#   find . -path ./.git -prune -o -name '* [0-9]'   -print -delete
+* [0-9]
+* [0-9].*
